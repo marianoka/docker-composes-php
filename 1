@@ -1,0 +1,51 @@
+version: '3'
+services:
+  #PHP App
+  app:
+    build:
+      context: .
+      dockerfile: config/dockerfile-oracle
+    image: dnm/php:7.4-fpm-alpine_oracle
+    container_name: php_app
+    restart: unless-stopped
+    tty: true
+    environment:
+      SERVICE_NAME: app
+      SERVICE_TAGS: dev
+    working_dir: /var/www/html
+    volumes:
+      - ./code/:/var/www/html
+      - ./config/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+      - ./tns_desa:/home/tns_desa
+    labels:
+      - "constraint:node==node-1"
+    networks:
+      - devnet
+
+  #Nginx Service
+  nginxmk:
+    image: nginx:alpine
+    container_name: nginxmk
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "8080:80"
+    volumes:
+      - ./code/:/var/www/html
+      - ./config/conf.d/:/etc/nginx/conf.d/
+    labels:
+      - "constraint:node==node-1"
+        #    restart_policy:
+        #condition: on-failure
+        #    deploy:
+        #mode: replicated
+        #replicas: 2
+        #      endpoint_mode: vip
+#Docker Networks
+#networks:
+#  labnet: 
+#    external:
+#      name: my-network
+networks:
+  devnet:
+    driver: overlay
