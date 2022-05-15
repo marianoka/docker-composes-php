@@ -1,0 +1,169 @@
+#FROM php:5.6-fpm-alpine
+FROM php:5.6-fpm-alpine3.8
+RUN mkdir /tmp/root
+RUN pear config-set temp_dir /tmp/root
+RUN mkdir -p /var/www/web
+WORKDIR /var/www/html
+# custom.ini is basically my php.ini
+#ADD custom.ini /usr/local/etc/php/conf.d/custom.ini
+RUN apk add openldap-back-mdb 
+#RUN apk add --update --virtual .build-deps g++ make zlib-dev libidn2-dev libevent-dev icu-dev libidn-dev openldap libxml2-dev
+RUN apk add --no-cache git bash tini memcached libmemcached-dev php5-pcntl php5-common php5-openssl php5-json php5-phar php5-zlib php5-xml php5-curl php5-dom php5-pdo php5-mysql php5-pdo_mysql \
+        && docker-php-ext-install pcntl pdo_mysql mysql json \
+        && docker-php-ext-enable pcntl pdo_mysql mysql json
+RUN apk --update --no-cache add libldap php5-ldap  openldap-clients openldap openldap-back-mdb
+RUN apk add --update --no-cache \
+    libzip-dev \
+    curl-dev \
+    libxml2-dev \
+    libpng-dev \
+    $PHPIZE_DEPS \
+    libnsl \
+    libaio \
+    gcc \
+    #openssl-dev \
+    autoconf \ 
+    musl-dev \
+    php5-openssl \
+    libc6-compat \
+    gcompat
+
+RUN docker-php-ext-configure gd
+
+RUN docker-php-ext-install \
+    curl \
+    dom \
+    gd \
+    json \
+    tokenizer \
+    zip #\
+RUN pecl install redis-4.1.0 && docker-php-ext-enable redis
+##memcached
+#RUN cd /tmp/root \
+#    && curl -o php-memcache.tgz http://pecl.php.net/get/memcache-3.0.8.tgz \
+#    && tar -xzvf php-memcache.tgz #\
+#    && cd memcache-3.0.8 \
+#    && curl -o memcache-faulty-inline.patch http://git.alpinelinux.org/cgit/aports/plain/main/php5-memcache/memcache-faulty-inline.patch?h=3.4-stable \
+#    && patch -p1 -i memcache-faulty-inline.patch \
+#    && phpize \
+#    && ./configure --prefix=/usr \
+#    && make INSTALL_ROOT=/ install \
+#    && install -d ./etc/php/conf.d \
+#    && echo "extension=memcache.so" > /usr/local/etc/php/conf.d/memcache.ini
+##
+##inicio memcache
+# Install PHP Extensions (igbinary & memcached)
+RUN apk add --no-cache --update libmemcached-libs zlib
+RUN set -xe && \
+    cd /tmp/ && \
+    apk add --no-cache --update --virtual .phpize-deps $PHPIZE_DEPS && \
+    apk add --no-cache --update --virtual .memcached-deps zlib-dev libmemcached-dev cyrus-sasl-dev && \
+# Install igbinary (memcached's deps)
+    pecl install igbinary-1.2.1 && pecl install --nobuild memcache-2.2.6 && \
+# Install memcached
+# Install memcached
+    ( \
+        #pecl install --nobuild memcached && \
+        cd /tmp/root/memcache && \
+        phpize && \
+        ./configure --enable-memcached-igbinary && \
+        make -j$(nproc) && \
+        make install && \
+        cd /tmp/ \
+    ) #&& \
+RUN phpize
+# Enable PHP extensions
+RUN    docker-php-ext-enable memcache igbinary # memcache #&& \
+RUN    rm -rf /tmp/* #&& \
+RUN    apk del .memcached-deps .phpize-deps# Enable PHP extensions
+#RUN    docker-php-ext-enable igbinary && memcached #&& \
+#    rm -rf /tmp/* && \
+#    apk del .memcached-deps .phpize-deps
+###fin memcache
+
+### Soporte LDAP
+ARG DOCKER_PHP_ENABLE_LDAP
+
+RUN echo -n "With ldap support:          " ; if [[ "${DOCKER_PHP_ENABLE_LDAP}" = "on" ]] ;      then echo "Yes"; else echo "No" ; fi && \
+    if [ -z ${DOCKER_USER_UID+x} ]; then echo "DOCKER_USER_UID is unset"; DOCKER_USER_UID=1000; else echo "DOCKER_USER_UID is set to '$DOCKER_USER_UID'"; fi && \
+    if [ -z ${DOCKER_USER_GID+x} ]; then echo "DOCKER_USER_GID is unset"; DOCKER_USER_GID=1000; else echo "DOCKER_USER_GID is set to '$DOCKER_USER_GID'"; fi
+
+# Enable LDAP
+ARG DOCKER_PHP_ENABLE_LDAP
+RUN echo -n "With ldap support:          " ; if [[ "${DOCKER_PHP_ENABLE_LDAP}" = "on" ]] ;      then echo "Yes"; else echo "No" ; fi && \
+    if [ -z ${DOCKER_USER_UID+x} ]; then echo "DOCKER_USER_UID is unset"; DOCKER_USER_UID=1000; else echo "DOCKER_USER_UID is set to '$DOCKER_USER_UID'"; fi && \
+    if [ -z ${DOCKER_USER_GID+x} ]; then echo "DOCKER_USER_GID is unset"; DOCKER_USER_GID=1000; else echo "DOCKER_USER_GID is set to '$DOCKER_USER_GID'"; fi
+RUN if [ "${DOCKER_PHP_ENABLE_LDAP}" != "off" ]; then \
+      # Dependancy for ldap \
+      apk add --update --no-cache \
+          libldap && \
+      # Build dependancy for ldap \
+      apk add --update --no-cache --virtual .docker-php-ldap-dependancies \
+          openldap-dev && \
+      docker-php-ext-configure ldap && \
+      docker-php-ext-install ldap && \
+      apk del .docker-php-ldap-dependancies && \
+      php -m; \
+    else \
+      echo "Skip ldap support"; \
+    fi
+##Fin soporte LDAP
+
+RUN ln -s /usr/lib/libnsl.so.2 /usr/lib/libnsl.so.1 && \
+    ln -s /usr/lib/libc.so /usr/lib/libresolv.so.2 
+# Install Oracle Instantclient
+RUN mkdir /opt && mkdir /opt/oracle \
+    && cd /opt/oracle
+
+ADD instantclient-basic-linux-x64.zip /opt/oracle/instantclient-basic-linux-x64.zip
+ADD instantclient-sdk-linux.x64.zip /opt/oracle/instantclient-sdk-linux.x64.zip
+
+#RUN unzip /opt/oracle/instantclient-basic-linux-x64.zip -d /opt/oracle \
+#    && unzip /opt/oracle/instantclient-sdk-linux.x64.zip -d /opt/oracle \
+
+RUN ln -s /usr/include/php5 /usr/include/php \
+    && mkdir -p /opt/oracle/instantclient \
+    && unzip -o /opt/oracle/instantclient-basic-linux-x64.zip -d /opt/oracle \
+    && mv /opt/oracle/instantclient_12_2 /opt/oracle/instantclient/lib \
+    && unzip -o /opt/oracle/instantclient-sdk-linux.x64.zip -d /opt/oracle \
+    && mv /opt/oracle/instantclient_12_2/sdk/include /opt/oracle/instantclient/include \
+    && ln -s /opt/oracle/instantclient/lib/libclntsh.so.12.1 /opt/oracle/instantclient/lib/libclntsh.so \
+    && ln -s /opt/oracle/instantclient/lib/libocci.so.12.1 /opt/oracle/instantclient/lib/libocci.so \
+    && echo /opt/oracle/instantclient/lib >> /etc/ld.so.conf 
+RUN ldconfig /opt/oracle/instantclient/lib
+#  2) OCI8
+RUN echo 'instantclient,/opt/oracle/instantclient/lib' | pecl install oci8-2.0.12
+ADD oci8.ini /usr/local/etc/php/conf.d/20-oci8.ini
+#RUN mkdir /opt/oracle \
+#    && cd /opt/oracle 
+
+#ADD instantclient-basic-linux.x64-19.15.0.0.0dbru.zip /opt/oracle/instantclient-basic-linux.x64-19.15.0.0.0dbru.zip
+#ADD instantclient-sdk-linux.x64-19.15.0.0.0dbru.zip /opt/oracle/instantclient-sdk-linux.x64-19.15.0.0.0dbru.zip
+
+# copy composer from official image
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+#RUN rm -rf /opt/oracle/instantclient_19_6/*
+
+#RUN unzip /opt/oracle/instantclient-basic-linux.x64-19.15.0.0.0dbru.zip -d /opt/oracle \
+#    && unzip /opt/oracle/instantclient-sdk-linux.x64-19.15.0.0.0dbru.zip -d /opt/oracle \
+ #   && ln -sf /opt/oracle/instantclient_19_15/libclntsh.so.19.1 /opt/oracle/instantclient_19_15/libclntsh.so \
+ #   && ln -sf /opt/oracle/instantclient_19_15/libclntshcore.so.19.1 /opt/oracle/instantclient_19_15/libclntshcore.so \
+ #   && ln -sf /opt/oracle/instantclient_19_15/libocci.so.19.1 /opt/oracle/instantclient_19_15/libocci.so \
+ #   && rm -rf /opt/oracle/*.zip
+
+# Install Oracle extensions
+#RUN docker-php-ext-configure pdo_oci --with-pdo-oci=instantclient,/opt/oracle/instantclient_19_15,19.1 \
+#       && echo 'instantclient,/opt/oracle/instantclient_19_15/' | pecl install pecl install oci8-2.2.0  \
+#       && docker-php-ext-install \
+#               pdo_oci \
+#       && docker-php-ext-enable \
+#               oci8
+#
+#
+RUN rm /usr/local/etc/php-fpm.d/www.conf
+ADD php56.pool.conf /usr/local/etc/php-fpm.d/
+RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/ --allow-untrusted gnu-libiconv
+ENV LD_PRELOAD /usr/lib/preloadable_libiconv.so php
+
+EXPOSE  9000
