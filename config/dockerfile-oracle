@@ -1,9 +1,9 @@
-FROM php:7.4-fpm-alpine
-
+#FROM php:7.4-fpm-alpine
+FROM php:7.4-fpm-alpine3.13
 RUN mkdir -p /var/www/web
 WORKDIR /var/www/html
 # custom.ini is basically my php.ini
-#ADD custom.ini /usr/local/etc/php/conf.d/custom.ini
+ADD 00-custom.php.ini /usr/local/etc/php/conf.d/custom.ini
 RUN apk add openldap-back-mdb
 RUN apk add --update --virtual .build-deps g++ make zlib-dev libidn2-dev libevent-dev icu-dev libidn-dev openldap libxml2-dev
 RUN apk --update --no-cache add php7-ldap libldap php-ldap  openldap-clients openldap openldap-back-mdb

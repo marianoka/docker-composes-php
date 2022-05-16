@@ -1,0 +1,3 @@
+docker stack deploy -c docker-composemk.yml webapp #Crear el stack
+docker service scale webapp_nginxmk=3 #escala el WB a 3
+docker service ls #lista la cantidad de servicios
