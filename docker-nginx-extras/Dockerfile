@@ -155,8 +155,8 @@ RUN mkdir -p /var/www/html \
     && ln -sf /dev/stderr /var/log/nginx/error.log \
     && cp /usr/share/nginx/html/* /var/www/html
 
-COPY conf/nginx.conf /etc/nginx/nginx.conf
-COPY conf/nginx.vh.default.conf /etc/nginx/conf.d/default.conf
+#COPY conf/nginx.conf /etc/nginx/nginx.conf
+COPY config/nginx.vh.default.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80 443
 STOPSIGNAL SIGQUIT

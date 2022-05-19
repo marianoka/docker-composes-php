@@ -43,7 +43,7 @@ services:
       - devnet
   #Nginx Service
   nginxmk:
-    image: nginx:alpine
+    image: nginx_extras:latest
     container_name: nginxmk
     restart: unless-stopped
     tty: true
