@@ -83,10 +83,14 @@ RUN mkdir -p /var/www/html \
     && export GNUPGHOME="$(mktemp -d)" \
     && found=''; \
     for server in \
-        ha.pool.sks-keyservers.net \
-        hkp://keyserver.ubuntu.com:80 \
-        hkp://p80.pool.sks-keyservers.net:80 \
-        pgp.mit.edu \
+        "hkp://keyserver.ubuntu.com:80" \
+    "keyserver.ubuntu.com" \
+    "ha.pool.sks-keyservers.net" \
+    "hkp://ha.pool.sks-keyservers.net:80" \ 
+    "p80.pool.sks-keyservers.net" \ 
+    "hkp://p80.pool.sks-keyservers.net:80" \ 
+    "pgp.mit.edu" \
+    "hkp://pgp.mit.edu:80" \
     ; do \
         echo "Fetching GPG key $GPG_KEYS from $server"; \
         gpg --keyserver "$server" --keyserver-options timeout=10 --recv-keys "$GPG_KEYS" && found=yes && break; \
