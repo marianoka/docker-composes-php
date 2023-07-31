@@ -1,13 +1,15 @@
-FROM alpine:3.14
+FROM alpine:3.18
 
 WORKDIR /var/www/html
 
-ENV NGINX_VERSION 1.21.6
-ENV MORE_SET_HEADER_VERSION 0.33
+#ENV NGINX_VERSION 1.21.5
+ENV NGINX_VERSION 1.25.1
+ENV MORE_SET_HEADER_VERSION 0.34
 ENV FANCYINDEX 0.5.1
 
 RUN mkdir -p /var/www/html \
-    && GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
+    #&& GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
+    && GPG_KEYS=573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62 \
     && CONFIG="\
         --prefix=/etc/nginx \
         --sbin-path=/usr/sbin/nginx \
@@ -53,7 +55,7 @@ RUN mkdir -p /var/www/html \
         --with-file-aio \
         --with-http_v2_module \
         --add-module=/tmp/headers-more-nginx-module-$MORE_SET_HEADER_VERSION \
-        --add-module=/tmp/ngx-fancyindex-$FANCYINDEX \
+        #--add-module=/tmp/ngx-fancyindex-$FANCYINDEX \
         --add-module=/tmp/ngx_http_substitutions_filter_module \
     " \
     && addgroup -S nginx \
@@ -76,14 +78,18 @@ RUN mkdir -p /var/www/html \
     && git clone https://github.com/yaoweibin/ngx_http_substitutions_filter_module.git /tmp/ngx_http_substitutions_filter_module \
     && curl -sfSL https://github.com/openresty/headers-more-nginx-module/archive/v$MORE_SET_HEADER_VERSION.tar.gz -o $MORE_SET_HEADER_VERSION.tar.gz \
     && tar xvf $MORE_SET_HEADER_VERSION.tar.gz \
-    && curl -sfSL https://github.com/aperezdc/ngx-fancyindex/releases/download/v$FANCYINDEX/ngx-fancyindex-$FANCYINDEX.tar.xz -o fancyindex.tar.xz \
-    && tar xvf fancyindex.tar.xz \
+    #&& curl -sfSL https://github.com/aperezdc/ngx-fancyindex/releases/download/v$FANCYINDEX/ngx-fancyindex-$FANCYINDEX.tar.xz -o fancyindex.tar.xz \
+    #&& tar xvf fancyindex.tar.xz \
     && curl -sfSL https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
     && curl -sfSL https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc \
     && export GNUPGHOME="$(mktemp -d)" \
     && found=''; \
     for server in \
-        "hkp://keyserver.ubuntu.com:80" \
+    #    ha.pool.sks-keyservers.net \
+    #    hkp://keyserver.ubuntu.com:80 \
+    #    hkp://p80.pool.sks-keyservers.net:80 \
+    #    pgp.mit.edu \
+    "hkp://keyserver.ubuntu.com:80" \
     "keyserver.ubuntu.com" \
     "ha.pool.sks-keyservers.net" \
     "hkp://ha.pool.sks-keyservers.net:80" \ 
@@ -96,8 +102,9 @@ RUN mkdir -p /var/www/html \
         gpg --keyserver "$server" --keyserver-options timeout=10 --recv-keys "$GPG_KEYS" && found=yes && break; \
     done; \
     test -z "$found" && echo >&2 "error: failed to fetch GPG key $GPG_KEYS" && exit 1; \
-    gpg --batch --verify nginx.tar.gz.asc nginx.tar.gz \
-    && pkill -9 gpg-agent \
+    ##gpg --batch --verify nginx.tar.gz.asc nginx.tar.gz \
+    ##&& 
+    pkill -9 gpg-agent \
     && pkill -9 dirmngr \
     && rm -r "$GNUPGHOME" nginx.tar.gz.asc \
     && mkdir -p /usr/src \
@@ -149,8 +156,8 @@ RUN mkdir -p /var/www/html \
     && mv /tmp/envsubst /usr/local/bin/ \
     && rm /tmp/$MORE_SET_HEADER_VERSION.tar.gz \
     && rm -rf /tmp/headers-more-nginx-module-$MORE_SET_HEADER_VERSION \
-    && rm /tmp/fancyindex.tar.xz \
-    && rm -rf /tmp/ngx-fancyindex-$FANCYINDEX \
+    #&& rm /tmp/fancyindex.tar.xz \
+    #&& rm -rf /tmp/ngx-fancyindex-$FANCYINDEX \
     && rm -rf /tmp/ngx_http_substitutions_filter_module \
     && rm -rf /tmp/pear \
     \
@@ -159,8 +166,8 @@ RUN mkdir -p /var/www/html \
     && ln -sf /dev/stderr /var/log/nginx/error.log \
     && cp /usr/share/nginx/html/* /var/www/html
 
-#COPY conf/nginx.conf /etc/nginx/nginx.conf
-COPY config/nginx.vh.default.conf /etc/nginx/conf.d/default.conf
+COPY conf/nginx.conf /etc/nginx/nginx.conf
+COPY conf/nginx.vh.default.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80 443
 STOPSIGNAL SIGQUIT
